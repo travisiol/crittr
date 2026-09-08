@@ -5,6 +5,7 @@ import { canStand, dist2, getMap, type Interactable, type MapId, type Npc, type 
 import type { Look, RoomInfo, SelfState, ServerMsg, VerifyResponse } from "@/shared/protocol";
 import { WALK_SPEED, MOVE_HZ } from "@/shared/protocol";
 import { ITEMS, JOB_LABEL } from "@/shared/items";
+import { speciesById } from "@/shared/species";
 import { api, getSession, setSession } from "@/lib/api";
 import { Renderer } from "./engine/renderer";
 import { Net, type NetStatus } from "./engine/net";
@@ -43,11 +44,14 @@ export function Game() {
   const rendererRef = useRef<Renderer | null>(null);
   const netRef = useRef<Net | null>(null);
   const inputRef = useRef<Input | null>(null);
+  // The touch pad is a React child, so the input also lives in state.
+  const [input, setInput] = useState<Input | null>(null);
   const promptRef = useRef<Prompt | null>(null);
-  const nearRef = useRef<{ spot: Spot | null; target: Interactable | null; npc: Npc | null }>({
+  const nearRef = useRef<{ spot: Spot | null; target: Interactable | null; npc: Npc | null; wild: string | null }>({
     spot: null,
     target: null,
     npc: null,
+    wild: null,
   });
 
   const [phase, setPhase] = useState<Phase>("title");
@@ -310,7 +314,8 @@ export function Game() {
           setModal("bank");
           return;
         case "use":
-          if (nearRef.current.spot) sendJob(null);
+          if (nearRef.current.wild) netRef.current?.send({ t: "tame", wildId: nearRef.current.wild });
+          else if (nearRef.current.spot) sendJob(null);
           else if (nearRef.current.npc || nearRef.current.target) interact();
           return;
         case "slot1":
@@ -349,6 +354,7 @@ export function Game() {
     renderer.resize();
     const input = new Input((a) => onActionRef.current(a));
     inputRef.current = input;
+    setInput(input);
     input.attach();
     if (process.env.NODE_ENV !== "production") {
       // Dev hook: lets a console (or a test) move the camera and read state.
@@ -413,12 +419,36 @@ export function Game() {
             npc = n;
           }
         }
-        nearRef.current = { spot, target, npc };
+        // A wild critter has to be almost touching before it takes the
+        // prompt away from a working spot you are standing at.
+        let wild: string | null = null;
+        best = 1.7 * 1.7;
+        for (const c of w.wild.values()) {
+          const d = dist2(me.x, me.y, c.dx, c.dy);
+          if (d < best) {
+            best = d;
+            wild = c.id;
+          }
+        }
+        nearRef.current = { spot, target, npc, wild };
 
         let next: Prompt | null = null;
         if (npc) next = { key: "E", text: npc.key === "trader" ? "Talk to the trader" : `Talk to the ${npc.name.toLowerCase()}` };
         else if (target) next = { key: "E", text: target.label };
-        else if (spot) {
+        else if (wild) {
+          const treats = w.selfState?.bag.find((b) => b.item === "treat")?.qty ?? 0;
+          const seen = w.wild.get(wild);
+          const species = seen ? speciesById(seen.species).name : "critter";
+          if (treats > 0) {
+            next = {
+              key: "SPACE",
+              text: `Offer a treat to the ${species.toLowerCase()}`,
+              hint: seen && seen.trust > 0 ? `${Math.round(seen.trust)}% of the way · ${treats} left` : `${treats} treats`,
+            };
+          } else {
+            next = { key: "", text: "A treat would keep it here. The trader sells them.", dim: true };
+          }
+        } else if (spot) {
           const followers = w.selfState?.critters.filter((c) => c.state === "follow") ?? [];
           const busy = w.selfState?.critters.some((c) => c.job?.spotId === spot.id);
           if (followers.length) next = { key: "SPACE", text: `Send ${followers[0].name} to ${JOB_LABEL[spot.job].verb}`, hint: "1 2 3 picks another" };
@@ -439,6 +469,7 @@ export function Game() {
       renderer.render(w, currentMap, {
         nearSpot: nearRef.current.spot,
         target: nearRef.current.target,
+        nearWild: nearRef.current.wild,
         spectating: !w.self,
       });
       raf = requestAnimationFrame(frame);
@@ -448,6 +479,7 @@ export function Game() {
     return () => {
       cancelAnimationFrame(raf);
       input.detach();
+      setInput(null);
       window.removeEventListener("resize", onResize);
     };
   }, [phase, world]);
@@ -542,6 +574,7 @@ export function Game() {
           world={world}
           session={session}
           onToast={toast}
+          input={input}
           address={verify?.address ?? null}
           onGetKeeper={() => setPhase("title")}
           onSignOut={signOut}

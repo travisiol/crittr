@@ -56,6 +56,8 @@ export interface WildView {
   y: number;
   facing: Facing;
   moving: boolean;
+  /** 0 to TRUST_FULL. Filled with treats; it joins whoever fills it. */
+  trust: number;
 }
 
 export interface OwnedCritter {
@@ -108,6 +110,7 @@ export type ClientMsg =
   | { t: "trade:sell"; items: string[] | "all" }
   | { t: "trade:buy"; item: string; qty: number }
   | { t: "feed"; critterId: string }
+  | { t: "tame"; wildId: string }
   | { t: "gate"; to: MapId }
   | { t: "board:collect" }
   | { t: "chat"; channel: "town" | "world"; text: string }

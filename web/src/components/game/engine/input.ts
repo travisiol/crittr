@@ -32,9 +32,20 @@ const ACTION_KEYS: Record<string, Action> = {
 
 export class Input {
   private down = new Set<string>();
+  /** Set by the on-screen pad; added to whatever the keyboard is doing. */
+  private touch = { x: 0, y: 0 };
   suspended = false;
 
   constructor(private onAction: (a: Action) => void) {}
+
+  /** A unit-ish vector from the on-screen pad, or zero when it is idle. */
+  setTouch(x: number, y: number) {
+    this.touch = { x, y };
+  }
+
+  fire(a: Action) {
+    this.onAction(a);
+  }
 
   attach() {
     window.addEventListener("keydown", this.onKeyDown);
@@ -82,14 +93,20 @@ export class Input {
   /** Unit-ish movement vector for this frame. */
   vector(): [number, number] {
     if (this.suspended) return [0, 0];
-    let x = 0;
-    let y = 0;
+    let x = this.touch.x;
+    let y = this.touch.y;
     for (const code of this.down) {
       const v = MOVE_KEYS[code];
       if (v) {
         x += v[0];
         y += v[1];
       }
+    }
+    const len = Math.hypot(x, y);
+    if (len > 1) {
+      x /= len;
+      y /= len;
+      return [x, y];
     }
     if (x && y) {
       x *= Math.SQRT1_2;
@@ -100,5 +117,6 @@ export class Input {
 
   release() {
     this.down.clear();
+    this.touch = { x: 0, y: 0 };
   }
 }

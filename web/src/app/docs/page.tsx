@@ -4,7 +4,7 @@ import { Header } from "@/components/landing/Header";
 import { Footer } from "@/components/landing/Footer";
 import { site } from "@/lib/site";
 import { BAG_CAPACITY, ITEMS, JOB_LABEL, JOB_SECONDS, SHOP, TRADER_DAILY_CAP, formatGold } from "@/shared/items";
-import { PARTY_SIZE, SPECIES, TYPE_LABEL, type JobKind } from "@/shared/species";
+import { MAX_CRITTERS, PARTY_SIZE, SPECIES, TYPE_LABEL, type JobKind } from "@/shared/species";
 
 export const metadata: Metadata = {
   title: `How to play ${site.name}`,
@@ -18,6 +18,7 @@ const SECTIONS = [
   ["critters", "Your critters"],
   ["controls", "Controls"],
   ["working", "Sending a critter to work"],
+  ["taming", "Catching a wild critter"],
   ["den", "Your den"],
   ["trader", "The trader"],
   ["worth", "What everything is worth"],
@@ -173,7 +174,12 @@ export default function DocsPage() {
           <H2 id="critters">Your critters</H2>
           <p>
             Every critter is one of six species, and every species is good at one job. Up to {PARTY_SIZE} follow you at a time and
-            can work at once; any beyond that rest in your den and still leave keepsakes there.
+            can work at once; any beyond that rest in your den and still leave keepsakes there. One keeper holds at most{" "}
+            {MAX_CRITTERS} of them.
+          </p>
+          <p>
+            There are two ways to get one. Catch a wild one in the meadow with treats, or hatch an egg once the hatchery opens.
+            A hatched critter is on chain and can be sold with its egg; a tamed one is yours and stays in the den.
           </p>
           <table className="my-3 w-full text-left">
             <thead>
@@ -205,7 +211,7 @@ export default function DocsPage() {
             <tbody>
               {[
                 ["WASD or arrows", "Walk"],
-                ["space", "Send the first idle critter to the spot in front of you; or use what is in front of you"],
+                ["space", "Offer a treat to the critter in front of you; send an idle critter to the spot; or use what is there"],
                 ["1 2 3", "Send that particular critter instead"],
                 ["E", "Go through a gate; read a sign or the board; talk to whoever you are standing at"],
                 ["I", "Open your bag"],
@@ -225,7 +231,10 @@ export default function DocsPage() {
             Watch the prompt over your head, not the buttons. When you are close enough to do something the game writes it out —{" "}
             <em>SPACE Send Mossit to forage</em>, <em>E Talk to the trader</em>. No prompt means you are too far away.
           </p>
-          <p>Keyboard and mouse only. There are no touch controls yet, so a phone will show you the meadow and let you sign in, but will not let you walk.</p>
+          <p>
+            On a phone or a tablet a thumb pad appears at the bottom left and two buttons at the bottom right, so the meadow
+            plays without a keyboard. The bar along the bottom still opens your bag, the map and the bank.
+          </p>
 
           <H2 id="working">Sending a critter to work</H2>
           <p>
@@ -251,6 +260,33 @@ export default function DocsPage() {
             Your bag holds {BAG_CAPACITY} things. A critter cannot be sent out when it is full, and a critter that comes back to a
             full bag drops what it found. Sell before it gets there.
           </p>
+
+          <H2 id="taming">Catching a wild critter</H2>
+          <p>
+            Critters wander the meadow on their own. They are not scenery: walk up to one holding a treat and it will stay for
+            it.
+          </p>
+          <ol className="my-3 list-decimal space-y-1 pl-6">
+            <li>Buy treats from the trader. They cost {formatGold(SHOP.treat)} gold each.</li>
+            <li>
+              Walk right up to a wild critter. The prompt reads <em>SPACE Offer a treat</em>, and a marker appears over its head.
+            </li>
+            <li>
+              Press <kbd>space</kbd>. It takes the treat and a bar under it fills a little. Three or four treats usually does
+              it.
+            </li>
+            <li>When the bar fills, it comes home with you and joins your critters.</li>
+          </ol>
+          <p>
+            Trust is on the critter, not on you. If somebody else has been feeding the same one, you are both filling the same
+            bar, and it goes home with whoever hands over the treat that fills it. Nothing is refunded to the other person, so
+            it is worth saying something in chat first.
+          </p>
+          <p>
+            One keeper holds at most {MAX_CRITTERS} critters, hatched and tamed together, because the nests pay per critter per
+            day. When you are full, the game says so rather than taking the treat.
+          </p>
+          <p>A caught critter is not an egg. It works, it fills a nest, and it stays in your den; it is not on chain and cannot be sold.</p>
 
           <H2 id="den">Your den</H2>
           <p>
@@ -349,8 +385,13 @@ export default function DocsPage() {
           </Note>
           <p>
             The rate can change, and the panel always shows the one in force. What you have already cashed out is not affected
-            when it does. A claim can only pay what the contract is holding: if the fee stream has been thin, the contract is
-            thin, and the panel says how much it holds.
+            when it does.
+          </p>
+          <p>
+            <strong>The game will not promise what the contract cannot pay.</strong> Before it takes your gold it checks the
+            contract balance against everything already owed to everybody. If your gold is worth more than is left, the
+            cash-out is refused and the panel says how much room there is. You keep the gold. It is better to be told now than
+            to hold a claim nobody can honour.
           </p>
           <p>
             Nothing about this happens in a private message. Nobody running this will ever ask for your seed phrase, ask you to
@@ -377,6 +418,14 @@ export default function DocsPage() {
               ["Your bag is full.", "Walk to the trader, press E, and sell. Junk clears for nothing."],
               ["You've sold me all I can take today.", "Keep what is left — it does not go off — and come back tomorrow."],
               ["My critter came back with nothing.", "You went through a gate, reloaded, or pressed Recall. Send it again."],
+              [
+                "The payout contract can only cover N more.",
+                "Everything already promised, plus what your gold is worth, would pass what the contract holds. Your gold is kept. Cash out less, or come back once it is topped up.",
+              ],
+              [
+                "You already keep six critters.",
+                "That is the ceiling for one den. A wild critter will not take your treat until you have room.",
+              ],
               ["You signed in from somewhere else.", "The same keeper opened the game in another tab. The newer one wins."],
             ].map(([q, a]) => (
               <div key={q}>

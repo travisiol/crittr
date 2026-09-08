@@ -110,5 +110,19 @@ export function speciesByKey(key: string): Species | undefined {
 /** Party size: how many critters follow the keeper and can work at once. */
 export const PARTY_SIZE = 3;
 
+/**
+ * How many critters one keeper may own, hatched and tamed together. The
+ * nests pay per critter per day, so without a ceiling a keeper could farm
+ * an unbounded number of them.
+ */
+export const MAX_CRITTERS = 6;
+
+/**
+ * Taming: a wild critter joins you when its trust fills. One treat is
+ * worth roughly a third of the way, so three or four treats does it.
+ */
+export const TRUST_FULL = 100;
+export const TRUST_PER_TREAT = { min: 25, max: 45 } as const;
+
 /** Nickname rules, shared by the fitting room and the server. */
 export const NICKNAME_RE = /^[A-Za-z0-9_]{3,8}$/;

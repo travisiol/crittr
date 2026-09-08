@@ -35,6 +35,8 @@ interface Drawable {
 export interface RenderOptions {
   nearSpot: Spot | null;
   target: Interactable | null;
+  /** The wild critter the keeper could offer a treat to, if any. */
+  nearWild: string | null;
   spectating: boolean;
 }
 
@@ -207,9 +209,17 @@ export class Renderer {
         draw: () => {
           const [sx, sy] = toScreen(c.dx, c.dy);
           const bob = c.moving ? (Math.floor(now / 220) % 2 ? -s : 0) : 0;
-          ctx.globalAlpha = 0.92;
+          const courted = opts.nearWild === c.id;
+          ctx.globalAlpha = courted ? 1 : 0.92;
           ctx.drawImage(critterSprite(c.species, c.facing), sx - 8 * s, sy - 14 * s + bob, 16 * s, 16 * s);
           ctx.globalAlpha = 1;
+          // Trust only shows once somebody has started, so the meadow is
+          // not covered in empty bars.
+          if (c.trust > 0) this.bar(sx - 8 * s, sy + s, 16 * s, 2 * s, c.trust / 100);
+          if (courted) {
+            const wobble = Math.floor(now / 340) % 2 ? -s : 0;
+            this.diamond(sx, sy - 18 * s + wobble, s, SUN);
+          }
         },
       });
     }

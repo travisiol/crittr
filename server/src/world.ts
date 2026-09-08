@@ -6,6 +6,7 @@ import {
   bagCount,
   getBag,
   getKeeper,
+  insertCritter,
   ledger,
   listCritters,
   nameTaken,
@@ -46,7 +47,15 @@ import {
   lootTable,
   rollLoot,
 } from "../../web/src/shared/items";
-import { PARTY_SIZE, SPECIES, speciesById, type JobKind } from "../../web/src/shared/species";
+import {
+  MAX_CRITTERS,
+  PARTY_SIZE,
+  SPECIES,
+  TRUST_FULL,
+  TRUST_PER_TREAT,
+  speciesById,
+  type JobKind,
+} from "../../web/src/shared/species";
 import {
   CHAT_MAX,
   WALK_SPEED,
@@ -118,6 +127,8 @@ interface Wild {
   tx: number;
   ty: number;
   nextThinkAt: number;
+  /** Fills with treats. At TRUST_FULL it goes home with whoever filled it. */
+  trust: number;
 }
 
 class Room {
@@ -171,6 +182,8 @@ export class World {
 
   /** Names the game's own keepers hold, so nobody can register one. */
   readonly botNames = new Set<string>();
+  /** Wild critter ids never repeat, so a caught one cannot be courted twice. */
+  private wildSeq = 0;
 
   constructor() {
     for (let i = 1; i <= config.roomCount; i++) {
@@ -324,6 +337,8 @@ export class World {
         return this.onBuy(c, String(msg.item ?? ""), Number(msg.qty ?? 0));
       case "feed":
         return this.onFeed(c, String(msg.critterId ?? ""));
+      case "tame":
+        return this.onTame(c, String(msg.wildId ?? ""));
       case "gate":
         return this.onGate(c, msg.to);
       case "board:collect":
@@ -584,6 +599,72 @@ export class World {
     send(c, { t: "self", self: this.selfState(c) });
   }
 
+  /**
+   * Offer a treat to a wild critter. Trust is on the critter, not on the
+   * keeper, so two people courting the same one are racing: it goes home
+   * with whoever hands over the treat that fills it.
+   */
+  private onTame(c: Client, wildId: string) {
+    if (!c.keeper || !c.room) return;
+    if (c.map !== "meadow") return;
+    const wild = c.room.wild.find((w) => w.id === wildId);
+    if (!wild) return send(c, { t: "toast", text: "It wandered off.", kind: "warn" });
+    if (dist2(c.x, c.y, wild.x, wild.y) > 2.0 * 2.0) {
+      return send(c, { t: "toast", text: "Too far away. Get closer, slowly.", kind: "warn" });
+    }
+    const k = c.keeper;
+    if (c.critters.length >= MAX_CRITTERS) {
+      return send(c, {
+        t: "toast",
+        text: `You already keep ${MAX_CRITTERS} critters. That is as many as one den holds.`,
+        kind: "warn",
+      });
+    }
+    const treats = getBag(k.id).find((b) => b.item === "treat")?.qty ?? 0;
+    if (treats <= 0) {
+      return send(c, { t: "toast", text: "You need a treat in hand. The trader sells them.", kind: "warn" });
+    }
+
+    const species = speciesById(wild.species);
+    const gain = TRUST_PER_TREAT.min + Math.floor(Math.random() * (TRUST_PER_TREAT.max - TRUST_PER_TREAT.min + 1));
+    transaction(() => {
+      addToBag(k.id, "treat", -1);
+      ledger(k.id, "tame", "treat", 1, 0);
+    });
+    wild.trust = Math.min(TRUST_FULL, wild.trust + gain);
+
+    if (wild.trust < TRUST_FULL) {
+      send(c, {
+        t: "toast",
+        text: `The ${species.name.toLowerCase()} took the treat. ${Math.round((wild.trust / TRUST_FULL) * 100)}% of the way.`,
+        kind: "info",
+      });
+      send(c, { t: "self", self: this.selfState(c) });
+      return;
+    }
+
+    // It joins. Take it out of the world and give the meadow a new one.
+    c.room.wild = c.room.wild.filter((w) => w.id !== wild.id);
+    const id = newCritterId();
+    insertCritter({ id, keeper: k.id, species: species.id, name: species.name, token_id: null });
+    ledger(k.id, "tamed", species.key, 1, 0);
+    c.critters.push({
+      id,
+      species: species.id,
+      name: species.name,
+      tokenId: null,
+      fed: false,
+      state: c.critters.filter((x) => x.state !== "rest").length < PARTY_SIZE ? "follow" : "rest",
+      x: c.x,
+      y: c.y,
+      facing: "down",
+      moving: false,
+    });
+    send(c, { t: "toast", text: `The ${species.name.toLowerCase()} is coming with you.`, kind: "good" });
+    send(c, { t: "self", self: this.selfState(c) });
+    setTimeout(() => this.addWild(c.room!), 20_000);
+  }
+
   private onGate(c: Client, to: MapId) {
     if (!c.keeper) return;
     if (to !== "meadow" && to !== "den") return;
@@ -744,15 +825,20 @@ export class World {
   // ── Simulation ────────────────────────────────────────────────────
 
   private spawnWild(room: Room) {
-    const map = getMap("meadow");
     room.wild = [];
-    let tries = 0;
-    while (room.wild.length < config.wildPerRoom && tries++ < 500) {
+    for (let i = 0; i < config.wildPerRoom; i++) this.addWild(room);
+  }
+
+  /** Put one more wild critter somewhere it can stand. */
+  private addWild(room: Room) {
+    const map = getMap("meadow");
+    if (room.wild.length >= config.wildPerRoom) return;
+    for (let tries = 0; tries < 400; tries++) {
       const x = 3 + Math.random() * (map.width - 6);
       const y = 3 + Math.random() * (map.height - 6);
       if (!canStand(map, x, y)) continue;
       room.wild.push({
-        id: `wild-${room.id}-${room.wild.length}`,
+        id: `wild-${room.id}-${this.wildSeq++}`,
         species: SPECIES[Math.floor(Math.random() * SPECIES.length)].id,
         x,
         y,
@@ -761,7 +847,9 @@ export class World {
         tx: x,
         ty: y,
         nextThinkAt: Date.now() + Math.random() * 3000,
+        trust: 0,
       });
+      return;
     }
   }
 
@@ -890,6 +978,7 @@ export class World {
         y: Math.round(w.y * 100) / 100,
         facing: w.facing,
         moving: w.moving,
+        trust: w.trust,
       }));
       const meadowMsg = JSON.stringify({ t: "snapshot", at: now, map: "meadow", players, critters, wild, spotLoad } satisfies ServerMsg);
       for (const c of room.clients) {

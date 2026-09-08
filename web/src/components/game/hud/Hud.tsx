@@ -12,6 +12,8 @@ import { ChatPanel, type ChatLine } from "./ChatPanel";
 import { PartyPanel } from "./PartyPanel";
 import { BagModal, BoardModal, MapModal, SignModal, TraderModal } from "./Modals";
 import { BankModal } from "./BankModal";
+import { TouchControls } from "./TouchControls";
+import type { Input } from "../engine/input";
 
 export interface Prompt {
   key: string;
@@ -44,6 +46,7 @@ export function Hud(props: {
   world: ClientWorld;
   session: string | null;
   onToast: (text: string, kind: "info" | "warn" | "good") => void;
+  input: Input | null;
   address: string | null;
   onGetKeeper: () => void;
   onSignOut: () => void;
@@ -129,6 +132,9 @@ export function Hud(props: {
           </button>
         </div>
       )}
+
+      {/* Phones and tablets. Renders nothing where a keyboard exists. */}
+      {self && modal === "none" && !props.chatOpen && <TouchControls input={props.input} />}
 
       {/* Chat. */}
       <ChatPanel lines={props.chat} open={props.chatOpen} setOpen={props.setChatOpen} canTalk={!!self} onSend={props.sendChat} />

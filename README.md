@@ -156,3 +156,51 @@ address is `payout.signer()` (Hardhat account #1 for the address above), and
 put the same addresses in `web/.env.local` with
 `NEXT_PUBLIC_ROBINHOOD_CHAIN_ID=31337`. `node server/scripts/earn-e2e.mjs`
 then walks the whole path and checks the wallet balance actually moved.
+
+## Catching a critter
+
+Wild critters wander the meadow and are not scenery. Walk up to one
+holding a treat, press space, and its trust bar fills a little; three or
+four treats and it comes home with you. Trust lives on the critter, not on
+the keeper, so two people feeding the same one are racing.
+
+A keeper holds at most `MAX_CRITTERS` (six) critters, hatched and tamed
+together, because the nests pay per critter per day. A tamed critter is not
+an egg: it works and fills a nest, but it is not on chain.
+
+## What keeps the money honest
+
+Three interlocks, all in the server rather than in a document:
+
+- **The door and earning cannot both be open.** `assertConfig` refuses to
+  start when earning is configured with `GATE=open`, because any wallet
+  could then make a keeper and cash out, and nobody makes one wallet.
+  `ALLOW_OPEN_GATE_EARNING=true` overrides it for a local chain.
+- **The server never promises more than the contract holds.** Before a
+  cash-out it reads the balance and subtracts everything already owed to
+  everybody, keeping `SOLVENCY_BUFFER_PCT` back. Over that line the
+  cash-out is refused with the number, and the gold stays gold.
+  `server/scripts/solvency-e2e.ts` drains the contract and proves it.
+- **The ledger is backed up.** `VACUUM INTO` every `BACKUP_MINUTES`,
+  keeping `BACKUP_KEEP` copies beside the database. Restoring is a file
+  move.
+
+Rate limits sit in front of the HTTP routes and the socket
+(`server/src/limits.ts`). They are a floor, not a substitute for a proxy.
+
+## Checks
+
+```bash
+cd contracts && npx hardhat test     # 48
+cd server && npm test && npm run typecheck
+cd web && npm run lint && npm run typecheck && npm run build
+```
+
+End to end, against a running server:
+
+```bash
+node server/scripts/e2e.mjs           # the loop: job, loot, trader, chat
+npx tsx server/scripts/tame-e2e.ts    # catching a wild critter
+node server/scripts/earn-e2e.mjs      # cash out, voucher, claim on chain
+npx tsx server/scripts/solvency-e2e.ts
+```
