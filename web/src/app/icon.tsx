@@ -3,6 +3,9 @@ import { CRITTER_SPRITES } from "@/shared/pixel/sprites";
 
 export const size = { width: 64, height: 64 };
 export const contentType = "image/png";
+// Drawn once at build time, not per request; the static export needs to be
+// told so explicitly.
+export const dynamic = "force-static";
 
 /** The favicon is Mossit, drawn from the same grid as the game sprite. */
 export default function Icon() {

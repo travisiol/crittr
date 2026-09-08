@@ -204,3 +204,28 @@ npx tsx server/scripts/tame-e2e.ts    # catching a wild critter
 node server/scripts/earn-e2e.mjs      # cash out, voucher, claim on chain
 npx tsx server/scripts/solvency-e2e.ts
 ```
+
+## Deploying the site
+
+The repository root is not a Next project: it holds three packages that
+deploy to different places. `web/` is the site, `server/` is the world, and
+`contracts/` never deploys anywhere but a chain. A host pointed at the root
+sees three folders and does not know what to build, which is what the root
+`vercel.json` answers:
+
+```json
+{
+  "installCommand": "npm --prefix web install",
+  "buildCommand": "npm --prefix web run build",
+  "outputDirectory": "web/out"
+}
+```
+
+Every route is static, so `next build` writes a plain folder of files that
+any host can serve. Connect the repository as it is, with the root
+directory left alone, and it builds. On a host without a `vercel.json`, set
+the build command and the output directory to the two lines above.
+
+The site works with no world server: the landing, the docs and the token
+page are static, and `/play` says plainly that the meadow is not answering.
+Point `NEXT_PUBLIC_SERVER_URL` at the world server once it has a home.
