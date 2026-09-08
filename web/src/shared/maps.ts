@@ -259,6 +259,14 @@ function buildMeadow(): GameMap {
   g.set(3, 19, T.FENCE);
   g.set(3, 16, T.FENCE);
 
+  // The lane between the pond and the east tree line is the only way round
+  // to the far bank, and the decorative tree scatter above is happy to
+  // close it. Two trees at (43,9) and (43,13) once sealed the pond_3 spot
+  // into a four-tile pocket nobody could reach. Keep the lane open on
+  // purpose, after the decoration rather than before it. Nothing at x=43
+  // can be shore: the water stops at x=41.
+  for (let y = 4; y <= 20; y++) g.set(43, y, T.GRASS);
+
   // Fence the quarry lip so the path reads as the only way in.
   g.rect(31, 23, 42, 23, T.FENCE);
   g.set(35, 23, T.DIRT);

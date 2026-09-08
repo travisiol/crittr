@@ -30,8 +30,19 @@ export interface TempDb {
 
 export async function openTempDb(label: string): Promise<TempDb> {
   const dir = mkdtempSync(join(tmpdir(), `crittr-${label}-`));
-  process.env.DB_PATH = join(dir, `${label}.sqlite`);
+  const path = join(dir, `${label}.sqlite`);
+  process.env.DB_PATH = path;
   const db = (await import("../../src/db")) as DbModule;
+
+  // If something imported db.ts before this ran, the tests would be writing
+  // into the real ./data/crittr.sqlite. Fail loudly rather than quietly.
+  const { config } = (await import("../../src/config")) as typeof import("../../src/config");
+  if (config.dbPath !== path) {
+    throw new Error(
+      `db.ts was already open on ${config.dbPath}. Set DB_PATH through openTempDb() before importing anything that pulls in src/db.ts.`,
+    );
+  }
+
   return {
     db,
     dir,
