@@ -63,7 +63,14 @@ export function TouchControls({ input }: { input: Input | null }) {
         className="pointer-events-auto absolute bottom-24 left-4 h-36 w-36 touch-none rounded-full border-3 border-hud-border bg-black/35"
         onPointerDown={(e) => {
           pointerId.current = e.pointerId;
-          (e.target as HTMLElement).setPointerCapture(e.pointerId);
+          try {
+            // Capture keeps the thumb working past the edge of the pad.
+            // Some browsers refuse it for a pointer they did not issue;
+            // aiming still has to happen either way.
+            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+          } catch {
+            // No capture, no problem: the pad just stops at its own edge.
+          }
           aim(e);
         }}
         onPointerMove={(e) => {

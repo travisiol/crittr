@@ -358,7 +358,9 @@ export function Game() {
     input.attach();
     if (process.env.NODE_ENV !== "production") {
       // Dev hook: lets a console (or a test) move the camera and read state.
-      (window as unknown as { __crittrWorld?: ClientWorld }).__crittrWorld = world;
+      const dev = window as unknown as { __crittrWorld?: ClientWorld; __crittrInput?: Input };
+      dev.__crittrWorld = world;
+      dev.__crittrInput = input;
     }
     const onResize = () => renderer.resize();
     window.addEventListener("resize", onResize);
